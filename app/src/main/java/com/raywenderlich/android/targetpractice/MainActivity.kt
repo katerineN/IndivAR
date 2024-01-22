@@ -156,7 +156,7 @@ class MainActivity : AppCompatActivity(), GLSurfaceView.Renderer {
     }
 
     private fun onDoubleTaping(e: MotionEvent){
-        if(scaleMode[mode.name] != 5.0f) {
+        if(scaleMode[mode.name] != 3.0f) {
             scaleMode[mode.name] = scaleMode[mode.name]!! + 0.5f
         }else{
             scaleMode[mode.name] = 1.0f
