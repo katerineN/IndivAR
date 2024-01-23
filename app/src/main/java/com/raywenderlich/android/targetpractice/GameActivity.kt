@@ -74,42 +74,70 @@ import androidx.appcompat.app.AlertDialog
 
 class GameActivity : AppCompatActivity() {
 
+    // Сцена и камера для AR
     private lateinit var scene: Scene
     private lateinit var camera: Camera
+
+    // Модель пули
     private lateinit var bulletRenderable: ModelRenderable
+
+    // Флаг для старта таймера
     private var shouldStartTimer = true
+
+    // Количество оставшихся воздушных шаров
     private var balloonsLeft = 20
+
+    // Точка на экране для определения места выстрела
     private lateinit var point: Point
+
+    // Текстовое поле для отображения количества оставшихся шаров
     private lateinit var balloonsLeftTxt: TextView
+
+    // Звуковой пул
     private lateinit var soundPool: SoundPool
     private var sound = 0
+
+    // Хранилище настроек
     private lateinit var sharedPreferences: SharedPreferences
+
+    // Имя игрока
     private lateinit var playerName: String
+
+    // Время старта игры
     private var startTimeMillis: Long = 0
+
+    // Счетчик бросков
+    private var throwsCount = 0
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Инициализация SharedPreferences
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
 
+        // Получение размеров экрана
         val display: Display = windowManager.defaultDisplay
         point = Point()
         display.getRealSize(point)
 
+        // Установка макета активности
         setContentView(R.layout.activity_game)
 
+        // Загрузка звукового пула
         loadSoundPool()
 
+        // Инициализация элементов интерфейса и сцены AR
         balloonsLeftTxt = findViewById(R.id.balloonsCntTxt)
         val arFragment = supportFragmentManager.findFragmentById(R.id.arFragment) as GameFragment
-
         scene = arFragment.arSceneView.scene
         camera = scene.camera
 
+        // Добавление воздушных шаров на сцену и создание модели пули
         addBalloonsToScene()
         buildBulletModel()
 
+        // Установка слушателя событий для кнопки "Shoot"
         val shoot: Button = findViewById(R.id.shootButton)
-
         shoot.setOnClickListener {
             if (shouldStartTimer) {
                 startTimer()
@@ -119,6 +147,7 @@ class GameActivity : AppCompatActivity() {
         }
     }
 
+    // Метод для загрузки звукового пула
     private fun loadSoundPool() {
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -133,11 +162,14 @@ class GameActivity : AppCompatActivity() {
         sound = soundPool.load(this, R.raw.blop_sound, 1)
     }
 
+    // Метод вызывается при уничтожении активности
     override fun onDestroy() {
+        // Сохранение результатов игры
         saveResults()
         super.onDestroy()
     }
 
+    // Метод для отображения диалога ввода имени
     private fun showNameInputDialog() {
         val inputDialog = AlertDialog.Builder(this)
         val inputView = EditText(this)
@@ -157,10 +189,11 @@ class GameActivity : AppCompatActivity() {
         inputDialog.show()
     }
 
+    // Метод для сохранения результатов игры в SharedPreferences
     @SuppressLint("MutatingSharedPrefs")
     private fun saveResults() {
         // Рассчитываем количество бросков и время
-        val totalThrows = 200 - balloonsLeft
+        val totalThrows = throwsCount
         val timeSpent = System.currentTimeMillis() - startTimeMillis
         val minutesPassed = timeSpent / (60 * 1000)
         val secondsPassed = (timeSpent % (60 * 1000)) / 1000
@@ -182,19 +215,25 @@ class GameActivity : AppCompatActivity() {
         }
     }
 
-
+    // Метод для обработки выстрела
     private fun shoot() {
+        // Увеличение счетчика бросков
+        throwsCount++
+
+        // Создание луча для определения точки выстрела
         val ray: Ray = camera.screenPointToRay(point.x / 2f, point.y / 2f)
         val node = Node()
         node.renderable = bulletRenderable
         scene.addChild(node)
 
+        // Запуск потока для обработки выстрела
         Thread {
             for (i in 0 until 200) {
                 runOnUiThread {
                     val vector3: Vector3 = ray.getPoint(i * 0.1f)
                     node.worldPosition = vector3
 
+                    // Проверка пересечения пули с воздушным шаром
                     val nodeInContact: Node? = scene.overlapTest(node)
                     if (nodeInContact != null) {
                         balloonsLeft--
@@ -213,6 +252,7 @@ class GameActivity : AppCompatActivity() {
         }.start()
     }
 
+    // Метод для запуска таймера игры
     private fun startTimer() {
         startTimeMillis = System.currentTimeMillis()
 
@@ -236,36 +276,43 @@ class GameActivity : AppCompatActivity() {
         }.start()
     }
 
+    // Метод для перехода в главное меню
     private fun navigateToMainMenu() {
         val intent = Intent(this, MainActivity::class.java)
         startActivity(intent)
         finish() // Закрываем текущую активность, чтобы пользователь не мог вернуться на нее кнопкой "назад"
     }
 
+    // Метод для создания модели пули
     private fun buildBulletModel() {
+        // Загрузка текстуры
         val textureBuilder = Texture.builder()
             .setSource(this, R.drawable.texture)
 
         textureBuilder.build().thenAccept { texture ->
+            // Создание материала с текстурой
             val materialBuilder = MaterialFactory.makeOpaqueWithTexture(this, texture)
             materialBuilder.thenAccept { material ->
+                // Создание модели пули
                 bulletRenderable = ShapeFactory.makeSphere(0.01f, Vector3(0f, 0f, 0f), material)
             }
         }
     }
 
-
-
+    // Метод для добавления воздушных шаров на сцену
     private fun addBalloonsToScene() {
+        // Загрузка модели воздушного шара
         ModelRenderable.builder()
             .setSource(this, Uri.parse("balloon.sfb"))
             .build()
             .thenAccept { renderable ->
+                // Создание нескольких экземпляров воздушных шаров на сцене
                 for (i in 0 until 20) {
                     val node = Node()
                     node.renderable = renderable
                     scene.addChild(node)
 
+                    // Рандомные координаты для размещения шаров
                     val random = Random()
                     val x = random.nextInt(10)
                     val z = -random.nextInt(10)
